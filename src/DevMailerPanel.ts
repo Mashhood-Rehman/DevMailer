@@ -329,6 +329,35 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                     .loading-overlay.visible {
                         display: flex;
                     }
+                    .usage-container {
+                        margin-top: 12px;
+                        padding: 8px 12px;
+                        background: var(--bg-secondary);
+                        border-radius: 8px;
+                        font-size: 0.8em;
+                    }
+                    .usage-bar-bg {
+                        width: 100%;
+                        height: 4px;
+                        background: rgba(255,255,255,0.1);
+                        border-radius: 2px;
+                        margin-top: 6px;
+                        overflow: hidden;
+                    }
+                    .usage-bar-fill {
+                        height: 100%;
+                        background: var(--accent);
+                        transition: width 0.3s ease;
+                    }
+                    .usage-text {
+                        display: flex;
+                        justify-content: space-between;
+                        color: var(--text-muted);
+                    }
+                    .usage-limit-reached {
+                        color: #ef4444;
+                        font-weight: bold;
+                    }
                 </style>
             </head>
             <body>
@@ -368,6 +397,16 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                                 </button>
                             </div>
                             <button id="refreshBtn" class="btn-primary">Refresh Inbox</button>
+                            
+                            <div class="usage-container">
+                                <div class="usage-text">
+                                    <span>Daily Limit</span>
+                                    <span id="usageLabel">0/10</span>
+                                </div>
+                                <div class="usage-bar-bg">
+                                    <div id="usageBar" class="usage-bar-fill" style="width: 0%"></div>
+                                </div>
+                            </div>
                         </div>
                         <div id="messageList" class="message-list">
                             <div class="empty-state">
@@ -388,6 +427,8 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                     const userName = document.getElementById('userName');
                     const userAvatar = document.getElementById('userAvatar');
                     const userAvatarPlace = document.getElementById('userAvatarPlace');
+                    const usageLabel = document.getElementById('usageLabel');
+                    const usageBar = document.getElementById('usageBar');
 
                     document.getElementById('loginBtn').addEventListener('click', () => {
                         vscode.postMessage({ type: 'login' });
@@ -418,6 +459,19 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                                         userAvatar.src = message.user.avatar;
                                         userAvatar.style.display = 'block';
                                         userAvatarPlace.style.display = 'none';
+                                    }
+                                    
+                                    // Update Usage
+                                    const sent = message.user.emailsSentToday || 0;
+                                    usageLabel.textContent = \`\${sent}/10\`;
+                                    const percent = (sent / 10) * 100;
+                                    usageBar.style.width = \`\${percent}%\`;
+                                    if (sent >= 10) {
+                                        usageLabel.classList.add('usage-limit-reached');
+                                        usageBar.style.background = '#ef4444';
+                                    } else {
+                                        usageLabel.classList.remove('usage-limit-reached');
+                                        usageBar.style.background = 'var(--accent)';
                                     }
                                 } else {
                                     authView.style.display = 'flex';

@@ -52,6 +52,12 @@ class DevMailerPanel {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
         webviewView.webview.onDidReceiveMessage(data => {
             switch (data.type) {
+                case 'login':
+                    vscode.commands.executeCommand('devmailer.login');
+                    break;
+                case 'logout':
+                    vscode.commands.executeCommand('devmailer.logout');
+                    break;
                 case 'refresh':
                     vscode.commands.executeCommand('devmailer.refresh');
                     break;
@@ -78,6 +84,14 @@ class DevMailerPanel {
             });
         }
     }
+    updateAuthState(user) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                type: 'authUpdate',
+                user
+            });
+        }
+    }
     _getHtmlForWebview(webview) {
         return `<!DOCTYPE html>
             <html lang="en">
@@ -86,13 +100,14 @@ class DevMailerPanel {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     :root {
-                        --padding: 12px;
-                        --border-radius: 8px;
+                        --padding: 16px;
+                        --border-radius: 12px;
                         --bg-secondary: var(--vscode-sideBar-background);
                         --item-hover: var(--vscode-list-hoverBackground);
                         --text-muted: var(--vscode-descriptionForeground);
-                        --accent: var(--vscode-button-background);
-                        --accent-hover: var(--vscode-button-hoverBackground);
+                        --accent: #3b82f6;
+                        --accent-hover: #2563eb;
+                        --card-bg: var(--vscode-editor-background);
                     }
                     body {
                         padding: 0;
@@ -106,18 +121,111 @@ class DevMailerPanel {
                         display: flex;
                         flex-direction: column;
                         height: 100vh;
+                        position: relative;
+                    }
+                    
+                    /* Auth View */
+                    #authView {
+                        display: none;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        height: 100%;
+                        padding: 20px;
+                        text-align: center;
+                    }
+                    .logo-placeholder {
+                        width: 64px;
+                        height: 64px;
+                        background: var(--accent);
+                        border-radius: 16px;
+                        margin-bottom: 24px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.3);
+                    }
+                    .auth-title {
+                        font-size: 1.5rem;
+                        font-weight: 700;
+                        margin-bottom: 8px;
+                    }
+                    .auth-desc {
+                        color: var(--text-muted);
+                        margin-bottom: 32px;
+                        line-height: 1.5;
+                    }
+                    .google-btn {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        background: white;
+                        color: #374151;
+                        border: 1px solid #d1d5db;
+                        padding: 10px 24px;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+                    }
+                    .google-btn:hover {
+                        background: #f9fafb;
+                        border-color: #9ca3af;
+                        transform: translateY(-1px);
+                    }
+
+                    /* Main View */
+                    #mainView {
+                        display: none;
+                        flex-direction: column;
+                        height: 100%;
                     }
                     .header {
                         padding: var(--padding);
                         border-bottom: 1px solid var(--vscode-divider);
-                        background-color: var(--vscode-sideBar-background);
-                        z-index: 10;
+                    }
+                    .user-bar {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        margin-bottom: 16px;
+                    }
+                    .user-info {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .avatar {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
+                        background: var(--accent);
+                    }
+                    .username {
+                        font-size: 0.85em;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                    }
+                    .logout-btn {
+                        font-size: 0.8em;
+                        color: var(--text-muted);
+                        cursor: pointer;
+                        background: none;
+                        border: none;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                    }
+                    .logout-btn:hover {
+                        background: var(--item-hover);
+                        color: var(--vscode-foreground);
                     }
                     .address-card {
-                        background: var(--vscode-editor-background);
-                        padding: 10px;
+                        background: var(--card-bg);
+                        padding: 12px;
                         border-radius: var(--border-radius);
-                        margin-bottom: 10px;
+                        margin-bottom: 12px;
                         border: 1px solid var(--vscode-widget-border);
                         display: flex;
                         align-items: center;
@@ -148,41 +256,41 @@ class DevMailerPanel {
                     }
                     .btn-primary {
                         background: var(--accent);
-                        color: var(--vscode-button-foreground);
+                        color: white;
                         border: none;
-                        padding: 6px 12px;
-                        border-radius: 4px;
+                        padding: 8px 16px;
+                        border-radius: 8px;
                         cursor: pointer;
                         width: 100%;
                         font-size: 0.9em;
                         font-weight: 600;
-                        transition: background 0.2s;
+                        transition: all 0.2s;
                     }
                     .btn-primary:hover {
                         background: var(--accent-hover);
+                        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
                     }
                     .message-list {
                         flex-grow: 1;
                         overflow-y: auto;
-                        padding: 8px;
+                        padding: 12px;
                     }
                     .message-item {
-                        padding: 10px;
+                        padding: 14px;
+                        background: var(--card-bg);
                         border-radius: var(--border-radius);
-                        margin-bottom: 6px;
+                        margin-bottom: 10px;
                         cursor: pointer;
-                        transition: background 0.2s;
-                        border-left: 3px solid transparent;
+                        transition: all 0.2s;
+                        border: 1px solid transparent;
                     }
                     .message-item:hover {
-                        background: var(--item-hover);
-                    }
-                    .message-item.new {
-                        border-left-color: var(--vscode-textLink-foreground);
+                        border-color: var(--vscode-focusBorder);
+                        transform: translateX(2px);
                     }
                     .message-subject {
-                        font-weight: 600;
-                        margin-bottom: 4px;
+                        font-weight: 700;
+                        margin-bottom: 6px;
                         white-space: nowrap;
                         overflow: hidden;
                         text-overflow: ellipsis;
@@ -192,11 +300,12 @@ class DevMailerPanel {
                         justify-content: space-between;
                         font-size: 0.8em;
                         color: var(--text-muted);
+                        margin-bottom: 8px;
                     }
                     .message-intro {
                         font-size: 0.85em;
                         color: var(--text-muted);
-                        margin-top: 4px;
+                        line-height: 1.4;
                         display: -webkit-box;
                         -webkit-line-clamp: 2;
                         -webkit-box-orient: vertical;
@@ -207,26 +316,24 @@ class DevMailerPanel {
                         flex-direction: column;
                         align-items: center;
                         justify-content: center;
-                        padding: 40px 20px;
+                        padding: 60px 20px;
                         text-align: center;
                         color: var(--text-muted);
-                        opacity: 0.7;
                     }
                     .empty-state svg {
-                        width: 48px;
-                        height: 48px;
+                        width: 64px;
+                        height: 64px;
                         margin-bottom: 16px;
+                        opacity: 0.2;
                     }
                     .loader {
-                        width: 16px;
-                        height: 16px;
-                        border: 2px solid var(--text-muted);
-                        border-bottom-color: transparent;
+                        width: 20px;
+                        height: 20px;
+                        border: 3px solid rgba(59, 130, 246, 0.3);
+                        border-bottom-color: var(--accent);
                         border-radius: 50%;
                         display: inline-block;
-                        box-sizing: border-box;
                         animation: rotation 1s linear infinite;
-                        margin-right: 8px;
                     }
                     @keyframes rotation {
                         0% { transform: rotate(0deg); }
@@ -236,13 +343,43 @@ class DevMailerPanel {
                         display: none;
                         position: absolute;
                         top: 0; left: 0; right: 0; bottom: 0;
-                        background: rgba(0,0,0,0.2);
+                        background: rgba(0,0,0,0.4);
+                        backdrop-filter: blur(2px);
                         z-index: 100;
                         align-items: center;
                         justify-content: center;
                     }
                     .loading-overlay.visible {
                         display: flex;
+                    }
+                    .usage-container {
+                        margin-top: 12px;
+                        padding: 8px 12px;
+                        background: var(--bg-secondary);
+                        border-radius: 8px;
+                        font-size: 0.8em;
+                    }
+                    .usage-bar-bg {
+                        width: 100%;
+                        height: 4px;
+                        background: rgba(255,255,255,0.1);
+                        border-radius: 2px;
+                        margin-top: 6px;
+                        overflow: hidden;
+                    }
+                    .usage-bar-fill {
+                        height: 100%;
+                        background: var(--accent);
+                        transition: width 0.3s ease;
+                    }
+                    .usage-text {
+                        display: flex;
+                        justify-content: space-between;
+                        color: var(--text-muted);
+                    }
+                    .usage-limit-reached {
+                        color: #ef4444;
+                        font-weight: bold;
                     }
                 </style>
             </head>
@@ -251,28 +388,78 @@ class DevMailerPanel {
                     <div id="loadingOverlay" class="loading-overlay">
                         <span class="loader"></span>
                     </div>
-                    <div class="header">
-                        <div class="address-card">
-                            <span id="addressDisplay" class="address-text">Generating...</span>
-                            <button id="copyBtn" class="icon-btn" title="Copy Address">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4V1H13L16 4V13H13V16H4V13H1V4H4ZM5 5H2V15H12V12H5V5ZM12.2929 4L10 1.70711V4H12.2929ZM15 12V5H9V1H5V4H9V12H15Z"/></svg>
-                            </button>
+
+                    <!-- Authorization View -->
+                    <div id="authView">
+                        <div class="logo-placeholder">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 17a2 2 0 01-2 2H4a2 2 0 01-2-2V9.5C2 7 4 5 6.5 5H18c2.5 0 4.5 2 4.5 4.5V17z"/><path d="M2 9.5l10 6 10-6"/></svg>
                         </div>
-                        <button id="refreshBtn" class="btn-primary">Refresh Messages</button>
+                        <h1 class="auth-title">DevMailer</h1>
+                        <p class="auth-desc">Test email integrations instantly.<br>Sign in to get started.</p>
+                        <button id="loginBtn" class="google-btn">
+                            <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                            Continue with Google
+                        </button>
                     </div>
-                    <div id="messageList" class="message-list">
-                        <div class="empty-state">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0l-7.5 7.5-7.5-7.5" /></svg>
-                            <p>No messages yet.<br>Waiting for emails to arrive...</p>
+
+                    <!-- Main Application View -->
+                    <div id="mainView">
+                        <div class="header">
+                            <div class="user-bar">
+                                <div class="user-info">
+                                    <img id="userAvatar" class="avatar" src="" style="display:none">
+                                    <div id="userAvatarPlace" class="avatar"></div>
+                                    <span id="userName" class="username">User</span>
+                                </div>
+                                <button id="logoutBtn" class="logout-btn">Logout</button>
+                            </div>
+                            <div class="address-card">
+                                <span id="addressDisplay" class="address-text">Generating...</span>
+                                <button id="copyBtn" class="icon-btn" title="Copy Address">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4V1H13L16 4V13H13V16H4V13H1V4H4ZM5 5H2V15H12V12H5V5ZM12.2929 4L10 1.70711V4H12.2929ZM15 12V5H9V1H5V4H9V12H15Z"/></svg>
+                                </button>
+                            </div>
+                            <button id="refreshBtn" class="btn-primary">Refresh Inbox</button>
+                            
+                            <div class="usage-container">
+                                <div class="usage-text">
+                                    <span>Daily Limit</span>
+                                    <span id="usageLabel">0/10</span>
+                                </div>
+                                <div class="usage-bar-bg">
+                                    <div id="usageBar" class="usage-bar-fill" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="messageList" class="message-list">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0l-7.5 7.5-7.5-7.5" /></svg>
+                                <p>No messages yet.<br>Waiting for emails to arrive...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <script>
                     const vscode = acquireVsCodeApi();
+                    const authView = document.getElementById('authView');
+                    const mainView = document.getElementById('mainView');
                     const messageList = document.getElementById('messageList');
                     const addressDisplay = document.getElementById('addressDisplay');
                     const loadingOverlay = document.getElementById('loadingOverlay');
+                    const userName = document.getElementById('userName');
+                    const userAvatar = document.getElementById('userAvatar');
+                    const userAvatarPlace = document.getElementById('userAvatarPlace');
+                    const usageLabel = document.getElementById('usageLabel');
+                    const usageBar = document.getElementById('usageBar');
+
+                    document.getElementById('loginBtn').addEventListener('click', () => {
+                        vscode.postMessage({ type: 'login' });
+                    });
+
+                    document.getElementById('logoutBtn').addEventListener('click', () => {
+                        vscode.postMessage({ type: 'logout' });
+                    });
 
                     document.getElementById('refreshBtn').addEventListener('click', () => {
                         vscode.postMessage({ type: 'refresh' });
@@ -286,6 +473,34 @@ class DevMailerPanel {
                     window.addEventListener('message', event => {
                         const message = event.data;
                         switch (message.type) {
+                            case 'authUpdate':
+                                if (message.user) {
+                                    authView.style.display = 'none';
+                                    mainView.style.display = 'flex';
+                                    userName.textContent = message.user.name;
+                                    if (message.user.avatar) {
+                                        userAvatar.src = message.user.avatar;
+                                        userAvatar.style.display = 'block';
+                                        userAvatarPlace.style.display = 'none';
+                                    }
+                                    
+                                    // Update Usage
+                                    const sent = message.user.emailsSentToday || 0;
+                                    usageLabel.textContent = \`\${sent}/10\`;
+                                    const percent = (sent / 10) * 100;
+                                    usageBar.style.width = \`\${percent}%\`;
+                                    if (sent >= 10) {
+                                        usageLabel.classList.add('usage-limit-reached');
+                                        usageBar.style.background = '#ef4444';
+                                    } else {
+                                        usageLabel.classList.remove('usage-limit-reached');
+                                        usageBar.style.background = 'var(--accent)';
+                                    }
+                                } else {
+                                    authView.style.display = 'flex';
+                                    mainView.style.display = 'none';
+                                }
+                                break;
                             case 'update':
                                 addressDisplay.textContent = message.address;
                                 updateMessages(message.messages);

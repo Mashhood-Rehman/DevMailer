@@ -95,4 +95,14 @@ export class MailService {
             console.error('Error deleting message:', error);
         }
     }
+
+    async getAuthStatus(): Promise<any> {
+        try {
+            const response = await axios.get('http://localhost:3000/auth/status');
+            return response.data;
+        } catch (error) {
+            console.error('Error getting auth status:', error);
+            return { authenticated: false };
+        }
+    }
 }

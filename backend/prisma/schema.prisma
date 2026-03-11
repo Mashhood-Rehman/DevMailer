@@ -8,11 +8,16 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  googleId      String   @unique
-  email         String   @unique
-  name          String?
-  avatar        String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  googleId        String   @unique
+  email           String   @unique
+  name            String?
+  avatar          String?
+  emailsSentToday Int      @default(0)
+  lastResetDate   DateTime @default(now())
+  lastLoginAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
+
+

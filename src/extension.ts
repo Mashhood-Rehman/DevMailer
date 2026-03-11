@@ -21,6 +21,16 @@ export async function activate(context: vscode.ExtensionContext) {
             return;
         }
 
+        try {
+            const status = await mailService.getAuthStatus();
+            if (status.authenticated) {
+                user = status.user;
+                context.globalState.update('user', user);
+            }
+        } catch (e) {
+            console.error('Failed to fetch latest user status:', e);
+        }
+
         provider.updateAuthState(user);
 
         if (!currentAccount || !token) {
@@ -40,17 +50,24 @@ export async function activate(context: vscode.ExtensionContext) {
     // URI Handler for Auth Callback
     const uriHandler = vscode.window.registerUriHandler({
         handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
-            if (uri.path === '/auth-complete') {
+            console.log(`[DevMailer] Received URI: ${uri.toString()}`);
+            console.log(`[DevMailer] URI Path: ${uri.path}`);
+            console.log(`[DevMailer] URI Authority: ${uri.authority}`);
+
+            // Support both /auth-complete and auth-complete
+            if (uri.path.includes('auth-complete')) {
                 const queryParams = new URLSearchParams(uri.query);
                 const userParam = queryParams.get('user');
                 if (userParam) {
                     try {
                         const userData = JSON.parse(decodeURIComponent(userParam));
+                        console.log(`[DevMailer] Auth successful for user: ${userData.email}`);
                         user = userData;
                         context.globalState.update('user', userData);
                         vscode.window.showInformationMessage(`Welcome, ${userData.name}!`);
                         updateView();
                     } catch (e) {
+                        console.error('[DevMailer] Failed to parse user data:', e);
                         vscode.window.showErrorMessage('Failed to parse authentication data.');
                     }
                 }
@@ -97,7 +114,28 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('devmailer.login', () => {
-            vscode.env.openExternal(vscode.Uri.parse('http://localhost:3000/auth/google'));
+            const scheme = vscode.env.uriScheme || 'vscode';
+            const extensionId = context.extension.id;
+            console.log(`[DevMailer] Initiating login with scheme: ${scheme}, extension: ${extensionId}`);
+            vscode.env.openExternal(vscode.Uri.parse(`http://localhost:3000/auth/google?scheme=${scheme}&extensionId=${extensionId}`));
+        }),
+        vscode.commands.registerCommand('devmailer.manualAuth', async () => {
+            const input = await vscode.window.showInputBox({
+                prompt: 'Paste the authentication token from your browser',
+                placeHolder: 'Paste the token here...'
+            });
+            if (input) {
+                try {
+                    // Expecting base64 encoded user JSON
+                    const userData = JSON.parse(Buffer.from(input, 'base64').toString('utf8'));
+                    user = userData;
+                    await context.globalState.update('user', userData);
+                    vscode.window.showInformationMessage(`Welcome, ${userData.name}!`);
+                    updateView();
+                } catch (e) {
+                    vscode.window.showErrorMessage('Invalid authentication token. Make sure you copied the correct code.');
+                }
+            }
         }),
         vscode.commands.registerCommand('devmailer.logout', async () => {
             user = undefined;

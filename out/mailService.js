@@ -81,6 +81,16 @@ class MailService {
             console.error('Error deleting message:', error);
         }
     }
+    async getAuthStatus() {
+        try {
+            const response = await axios_1.default.get('http://localhost:3000/auth/status');
+            return response.data;
+        }
+        catch (error) {
+            console.error('Error getting auth status:', error);
+            return { authenticated: false };
+        }
+    }
 }
 exports.MailService = MailService;
 //# sourceMappingURL=mailService.js.map

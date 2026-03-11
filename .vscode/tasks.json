@@ -8,6 +8,30 @@
             "problemMatcher": "$tsc-watch",
             "isBackground": true,
             "label": "npm: watch"
+        },
+        {
+            "type": "npm",
+            "script": "server",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "Server running on http://localhost:(\\d+)"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Server running on",
+                    "endsPattern": "Server running on"
+                }
+            },
+            "label": "npm: server"
+        },
+        {
+            "dependsOn": [
+                "npm: watch",
+                "npm: server"
+            ],
+            "label": "npm: full-dev",
+            "problemMatcher": []
         }
     ]
 }
