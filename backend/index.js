@@ -4,16 +4,17 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const session = require('express-session');
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
+const crypto = require('crypto');
+const axios = require('axios');
 
 const prisma = new PrismaClient();
 const app = express();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const cors = require('cors');
 const PORT = process.env.PORT || 3000;
 
 // CORS - allow extension and website
 app.use(cors({
-    origin: ['http://localhost:5173', 'vscode-webview://*'], 
+    origin: ['http://localhost:5173', 'vscode-webview://*'],
     credentials: true
 }));
 
@@ -75,18 +76,24 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(express.json());
+
+// Use express.json but save the raw body to req.rawBody for webhook verification
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 
 // Auth Routes
 app.get('/auth/google', (req, res, next) => {
     const scheme = req.query.scheme || 'vscode';
     const extensionId = req.query.extensionId || 'prime-laptops.devmailer';
     console.log(`Auth started with scheme: ${scheme}, extension: ${extensionId}`);
-    
+
     // Pass both scheme and extensionId in state
     const state = JSON.stringify({ scheme, extensionId });
-    
-    passport.authenticate('google', { 
+
+    passport.authenticate('google', {
         scope: ['profile', 'email'],
         prompt: 'select_account',
         state: state
@@ -223,11 +230,11 @@ app.post('/emails/increment', async (req, res) => {
 
     try {
         const { user, limit } = await checkDailyLimit(req.user.id);
-        
+
         if (user.emailsSentToday >= limit) {
-            return res.status(429).json({ 
-                error: 'Daily limit reached', 
-                message: `You can only send ${limit} emails per day on ${user.tier} tier.` 
+            return res.status(429).json({
+                error: 'Daily limit reached',
+                message: `You can only send ${limit} emails per day on ${user.tier} tier.`
             });
         }
 
@@ -242,7 +249,7 @@ app.post('/emails/increment', async (req, res) => {
     }
 });
 
-// --- Stripe Routes ---
+// --- Lemon Squeezy Routes ---
 
 app.post('/payments/create-checkout', async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -250,52 +257,86 @@ app.post('/payments/create-checkout', async (req, res) => {
     }
 
     try {
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            customer_email: req.user.email,
-            line_items: [
-                {
-                    price: process.env.STRIPE_PRICE_ID, // Ensure this is in .env
-                    quantity: 1,
+        const response = await axios.post('https://api.lemonsqueezy.com/v1/checkouts', {
+            data: {
+                type: "checkouts",
+                attributes: {
+                    checkout_data: {
+                        email: req.user.email,
+                        custom: {
+                            user_id: req.user.id
+                        }
+                    }
                 },
-            ],
-            mode: 'subscription',
-            success_url: `${process.env.FRONTEND_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.FRONTEND_URL}/pricing`,
-            metadata: {
-                userId: req.user.id
+                relationships: {
+                    store: {
+                        data: {
+                            type: "stores",
+                            id: process.env.LEMONSQUEEZY_STORE_ID
+                        }
+                    },
+                    variant: {
+                        data: {
+                            type: "variants",
+                            id: process.env.LEMONSQUEEZY_VARIANT_ID // Your plan ID
+                        }
+                    }
+                }
+            }
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.LEMONSQUEEZY_API_KEY}`,
+                'Accept': 'application/vnd.api+json',
+                'Content-Type': 'application/vnd.api+json'
             }
         });
 
-        res.json({ url: session.url });
+        // Lemon Squeezy returns the checkout url in this path:
+        res.json({ url: response.data.data.attributes.url });
     } catch (error) {
-        console.error('Stripe Error:', error);
+        console.error('Lemon Squeezy Error:', error.response?.data || error.message);
         res.status(500).json({ error: 'Failed to create checkout session' });
     }
 });
 
-// Stripe Webhook
-app.post('/payments/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    const sig = req.headers['stripe-signature'];
-    let event;
+// Lemon Squeezy Webhook
+app.post('/payments/webhook', async (req, res) => {
+    // We already use express.json(), but we need to verify with rawBody
+    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+    const signature = req.headers['x-signature'];
 
-    try {
-        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    } catch (err) {
-        return res.status(400).send(`Webhook Error: ${err.message}`);
+    // Verify signature to make sure it's actually Lemon Squeezy
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = Buffer.from(hmac.update(req.rawBody).digest('hex'), 'utf8');
+    const signatureBuffer = Buffer.from(signature || '', 'utf8');
+
+    if (digest.length !== signatureBuffer.length || !crypto.timingSafeEqual(digest, signatureBuffer)) {
+        return res.status(401).send('Invalid signature');
     }
 
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        const userId = session.metadata.userId;
+    try {
+        const payload = req.body;
+        const eventName = payload.meta.event_name;
 
-        await prisma.user.update({
-            where: { id: userId },
-            data: { 
-                tier: 'PREMIUM',
-                stripeCustomerId: session.customer
+        // Listen for new orders / subscriptions
+        if (eventName === 'order_created' || eventName === 'subscription_created') {
+            const customData = payload.meta.custom_data;
+            const customerId = payload.data.attributes.customer_id.toString();
+
+            if (customData && customData.user_id) {
+                await prisma.user.update({
+                    where: { id: customData.user_id },
+                    data: {
+                        tier: 'PREMIUM',
+                        lemonSqueezyId: customerId
+                    }
+                });
+                console.log(`Upgraded user ${customData.user_id} to PREMIUM via Lemon Squeezy.`);
             }
-        });
+        }
+    } catch (err) {
+        console.error("Webhook processing error:", err);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
     res.json({ received: true });

@@ -19,7 +19,7 @@ model User {
   name             String?
   avatar           String?
   tier             Tier     @default(FREE)
-  stripeCustomerId String?  @unique
+  lemonSqueezyId   String?  @unique
   emailsSentToday  Int      @default(0)
   lastResetDate    DateTime @default(now())
   lastLoginAt      DateTime @default(now())
