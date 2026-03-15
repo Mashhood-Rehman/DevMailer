@@ -7,17 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id              String   @id @default(cuid())
-  googleId        String   @unique
-  email           String   @unique
-  name            String?
-  avatar          String?
-  emailsSentToday Int      @default(0)
-  lastResetDate   DateTime @default(now())
-  lastLoginAt     DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+enum Tier {
+  FREE
+  PREMIUM
 }
+
+model User {
+  id               String   @id @default(cuid())
+  googleId         String   @unique
+  email            String   @unique
+  name             String?
+  avatar           String?
+  tier             Tier     @default(FREE)
+  stripeCustomerId String?  @unique
+  emailsSentToday  Int      @default(0)
+  lastResetDate    DateTime @default(now())
+  lastLoginAt      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 
 

@@ -7,7 +7,15 @@ require('dotenv').config();
 
 const prisma = new PrismaClient();
 const app = express();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const cors = require('cors');
 const PORT = process.env.PORT || 3000;
+
+// CORS - allow extension and website
+app.use(cors({
+    origin: ['http://localhost:5173', 'vscode-webview://*'], 
+    credentials: true
+}));
 
 // Passport Serialization
 passport.serializeUser((user, done) => {
@@ -174,6 +182,7 @@ async function checkDailyLimit(userId) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return null;
 
+    const limit = user.tier === 'PREMIUM' ? 50 : 10;
     const now = new Date();
     const lastReset = new Date(user.lastResetDate);
 
@@ -181,16 +190,17 @@ async function checkDailyLimit(userId) {
     const isNewDay = now.toDateString() !== lastReset.toDateString();
 
     if (isNewDay) {
-        return await prisma.user.update({
+        const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: {
                 emailsSentToday: 0,
                 lastResetDate: now
             }
         });
+        return { user: updatedUser, limit };
     }
 
-    return user;
+    return { user, limit };
 }
 
 app.get('/auth/status', async (req, res) => {
@@ -212,12 +222,12 @@ app.post('/emails/increment', async (req, res) => {
     }
 
     try {
-        const user = await checkDailyLimit(req.user.id);
+        const { user, limit } = await checkDailyLimit(req.user.id);
         
-        if (user.emailsSentToday >= 10) {
+        if (user.emailsSentToday >= limit) {
             return res.status(429).json({ 
                 error: 'Daily limit reached', 
-                message: 'You can only send 10 emails per day.' 
+                message: `You can only send ${limit} emails per day on ${user.tier} tier.` 
             });
         }
 
@@ -226,10 +236,69 @@ app.post('/emails/increment', async (req, res) => {
             data: { emailsSentToday: user.emailsSentToday + 1 }
         });
 
-        res.json({ success: true, emailsSentToday: updatedUser.emailsSentToday });
+        res.json({ success: true, emailsSentToday: updatedUser.emailsSentToday, limit });
     } catch (error) {
         res.status(500).json({ error: 'Internal server error' });
     }
+});
+
+// --- Stripe Routes ---
+
+app.post('/payments/create-checkout', async (req, res) => {
+    if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            customer_email: req.user.email,
+            line_items: [
+                {
+                    price: process.env.STRIPE_PRICE_ID, // Ensure this is in .env
+                    quantity: 1,
+                },
+            ],
+            mode: 'subscription',
+            success_url: `${process.env.FRONTEND_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_URL}/pricing`,
+            metadata: {
+                userId: req.user.id
+            }
+        });
+
+        res.json({ url: session.url });
+    } catch (error) {
+        console.error('Stripe Error:', error);
+        res.status(500).json({ error: 'Failed to create checkout session' });
+    }
+});
+
+// Stripe Webhook
+app.post('/payments/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        const userId = session.metadata.userId;
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { 
+                tier: 'PREMIUM',
+                stripeCustomerId: session.customer
+            }
+        });
+    }
+
+    res.json({ received: true });
 });
 
 app.get('/auth/logout', (req, res) => {

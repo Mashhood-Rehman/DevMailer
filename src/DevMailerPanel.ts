@@ -463,10 +463,14 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                                     
                                     // Update Usage
                                     const sent = message.user.emailsSentToday || 0;
-                                    usageLabel.textContent = \`\${sent}/10\`;
-                                    const percent = (sent / 10) * 100;
+                                    const limit = message.user.tier === 'PREMIUM' ? 50 : 10;
+                                    const tierName = message.user.tier || 'FREE';
+                                    
+                                    usageLabel.textContent = \`\${sent}/\${limit} (\${tierName})\`;
+                                    const percent = Math.min((sent / limit) * 100, 100);
                                     usageBar.style.width = \`\${percent}%\`;
-                                    if (sent >= 10) {
+                                    
+                                    if (sent >= limit) {
                                         usageLabel.classList.add('usage-limit-reached');
                                         usageBar.style.background = '#ef4444';
                                     } else {

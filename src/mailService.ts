@@ -32,6 +32,22 @@ export class MailService {
     }
 
     async createAccount(): Promise<{ address: string; password: string }> {
+        // Check/Increment limit on backend
+        try {
+            const incResponse = await axios.post('http://localhost:3000/emails/increment');
+            if (!incResponse.data.success) {
+                throw new Error(incResponse.data.message || 'Limit reached');
+            }
+        } catch (error: any) {
+            if (error.response && error.response.status === 429) {
+                throw new Error(error.response.data.message || 'Daily limit reached');
+            }
+            console.error('Limit check failed:', error);
+            // If backend is down, we might want to still allow it or block it. 
+            // For now, let's assume backend is required for tracking.
+            throw new Error('Could not verify daily limit with server.');
+        }
+
         const domain = await this.getDomain();
         const username = Math.random().toString(36).substring(2, 12);
         const password = Math.random().toString(36).substring(2, 12);
