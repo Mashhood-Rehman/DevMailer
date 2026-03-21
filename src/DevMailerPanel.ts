@@ -45,6 +45,9 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                 case 'openMessage':
                     vscode.commands.executeCommand('devmailer.openMessage', data.messageId);
                     break;
+                case 'deleteMessage':
+                    vscode.commands.executeCommand('devmailer.deleteMessage', data.messageId);
+                    break;
             }
         });
     }
@@ -265,12 +268,34 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                         border-color: var(--vscode-focusBorder);
                         transform: translateX(2px);
                     }
+                    .message-item:hover .delete-msg-btn {
+                        display: flex;
+                    }
+                    .message-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        margin-bottom: 6px;
+                    }
                     .message-subject {
                         font-weight: 700;
-                        margin-bottom: 6px;
                         white-space: nowrap;
                         overflow: hidden;
                         text-overflow: ellipsis;
+                        flex-grow: 1;
+                    }
+                    .delete-msg-btn {
+                        display: none;
+                        background: none;
+                        border: none;
+                        color: #ef4444;
+                        cursor: pointer;
+                        padding: 2px;
+                        border-radius: 4px;
+                        margin-left: 8px;
+                    }
+                    .delete-msg-btn:hover {
+                        background: rgba(239, 68, 68, 0.1);
                     }
                     .message-info {
                         display: flex;
@@ -502,7 +527,12 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
 
                         messageList.innerHTML = messages.map(msg => \`
                             <div class="message-item" onclick="openMessage('\${msg.id}')">
-                                <div class="message-subject">\${msg.subject || '(No Subject)'}</div>
+                                <div class="message-header">
+                                    <div class="message-subject">\${msg.subject || '(No Subject)'}</div>
+                                    <button class="delete-msg-btn" onclick="deleteMessage(event, '\${msg.id}')" title="Delete Message">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                    </button>
+                                </div>
                                 <div class="message-info">
                                     <span>\${msg.from.name || msg.from.address.split('@')[0]}</span>
                                     <span>\${new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -510,6 +540,11 @@ export class DevMailerPanel implements vscode.WebviewViewProvider {
                                 <div class="message-intro">\${msg.intro}</div>
                             </div>
                         \`).join('');
+                    }
+                    
+                    function deleteMessage(event, id) {
+                        event.stopPropagation();
+                        vscode.postMessage({ type: 'deleteMessage', messageId: id });
                     }
 
                     function openMessage(id) {

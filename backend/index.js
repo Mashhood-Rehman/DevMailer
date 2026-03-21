@@ -86,13 +86,11 @@ app.use(express.json({
 
 // Auth Routes
 app.get('/auth/google', (req, res, next) => {
-    const scheme = req.query.scheme || 'vscode';
-    const extensionId = req.query.extensionId || 'prime-laptops.devmailer';
-    console.log(`Auth started with scheme: ${scheme}, extension: ${extensionId}`);
-
-    // Pass both scheme and extensionId in state
-    const state = JSON.stringify({ scheme, extensionId });
-
+    const { scheme = 'vscode', extensionId = 'prime-laptops.devmailer', redirect } = req.query;
+    
+    // Pass scheme, extensionId, and optional redirect in state
+    const state = JSON.stringify({ scheme, extensionId, redirect });
+    
     passport.authenticate('google', {
         scope: ['profile', 'email'],
         prompt: 'select_account',
@@ -103,7 +101,27 @@ app.get('/auth/google', (req, res, next) => {
 app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login' }),
     (req, res) => {
-        // Successful authentication
+        let scheme = 'vscode';
+        let extensionId = 'prime-laptops.devmailer';
+        let redirect = null;
+
+        try {
+            if (req.query.state) {
+                const stateObj = JSON.parse(req.query.state);
+                scheme = stateObj.scheme || 'vscode';
+                extensionId = stateObj.extensionId || 'prime-laptops.devmailer';
+                redirect = stateObj.redirect;
+            }
+        } catch (e) {
+            console.error('Failed to parse state:', e);
+        }
+
+        // If a redirect URL was provided (website login), go there immediately
+        if (redirect) {
+            return res.redirect(redirect);
+        }
+
+        // Otherwise, show the VS Code success page
         const user = {
             id: req.user.id,
             name: req.user.name,
@@ -112,20 +130,6 @@ app.get('/auth/google/callback',
             emailsSentToday: req.user.emailsSentToday,
             lastResetDate: req.user.lastResetDate
         };
-
-        // Parse state
-        let scheme = 'vscode';
-        let extensionId = 'prime-laptops.devmailer';
-        try {
-            if (req.query.state) {
-                const state = JSON.parse(req.query.state);
-                scheme = state.scheme || 'vscode';
-                extensionId = state.extensionId || 'prime-laptops.devmailer';
-            }
-        } catch (e) {
-            console.error('Failed to parse state:', e);
-        }
-
         const userJson = JSON.stringify(user);
         const vscodeUri = `${scheme}://${extensionId}/auth-complete?user=${encodeURIComponent(userJson)}`;
         const manualToken = Buffer.from(userJson).toString('base64');

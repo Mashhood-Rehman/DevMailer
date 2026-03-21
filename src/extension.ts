@@ -11,9 +11,41 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(DevMailerPanel.viewType, provider)
     );
 
+    // Welcome Onboarding
+    const isFirstLaunch = context.globalState.get<boolean>('isFirstLaunch', true);
+    if (isFirstLaunch) {
+        vscode.window.showInformationMessage(
+            'Welcome to DevMailer! 📧 Your all-in-one email testing companion for VS Code.',
+            'Get Started', 'Learn More'
+        ).then(selection => {
+            if (selection === 'Get Started') {
+                vscode.commands.executeCommand('devmailer-explorer.focus');
+                vscode.window.showInformationMessage('Step 1: Click "Generate Temporary Email" in the sidebar to get started!');
+            } else if (selection === 'Learn More') {
+                vscode.env.openExternal(vscode.Uri.parse('https://github.com/Mashhood-Rehman/DevMailer'));
+            }
+        });
+        context.globalState.update('isFirstLaunch', false);
+    }
+
     let currentAccount = context.globalState.get<{ address: string; password: string }>('mailAccount');
     let token = context.globalState.get<string>('mailToken');
     let user = context.globalState.get<{ id: string, name: string, email: string, avatar?: string }>('user');
+
+    // Create Status Bar Item
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBarItem.command = 'devmailer-explorer.focus';
+    statusBarItem.tooltip = 'DevMailer: Current Temporary Email';
+    context.subscriptions.push(statusBarItem);
+
+    const updateStatusBar = () => {
+        if (currentAccount) {
+            statusBarItem.text = `$(mail) ${currentAccount.address}`;
+            statusBarItem.show();
+        } else {
+            statusBarItem.hide();
+        }
+    };
 
     const updateView = async (showLoading = false) => {
         if (!user) {
@@ -34,9 +66,13 @@ export async function activate(context: vscode.ExtensionContext) {
         provider.updateAuthState(user);
 
         if (!currentAccount || !token) {
+            statusBarItem.hide();
             await initializeAccount();
             return;
         }
+
+        updateStatusBar();
+
         try {
             provider.updateState(currentAccount.address, [], showLoading);
             const messages = await mailService.getMessages(token);
@@ -108,9 +144,32 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     };
 
-    // Auto update every 15 seconds
-    const interval = setInterval(() => updateView(), 15000);
-    context.subscriptions.push({ dispose: () => clearInterval(interval) });
+    // Management for dynamic interval
+    let pollInterval: NodeJS.Timeout | undefined;
+
+    const startPolling = () => {
+        if (pollInterval) { clearInterval(pollInterval); }
+
+        const config = vscode.workspace.getConfiguration('devmailer');
+        const autoRefresh = config.get<boolean>('autoRefresh', true);
+        const intervalSec = Math.max(config.get<number>('refreshInterval', 15), 5); // Minimum 5s
+
+        if (autoRefresh) {
+            console.log(`[DevMailer] Starting auto-refresh every ${intervalSec}s`);
+            pollInterval = setInterval(() => updateView(), intervalSec * 1000);
+        }
+    };
+
+    context.subscriptions.push({ dispose: () => { if (pollInterval) { clearInterval(pollInterval); } } });
+
+    // Listen for config changes
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('devmailer.autoRefresh') || e.affectsConfiguration('devmailer.refreshInterval')) {
+            startPolling();
+        }
+    }));
+
+    startPolling();
 
     context.subscriptions.push(
         vscode.commands.registerCommand('devmailer.login', () => {
@@ -204,6 +263,16 @@ export async function activate(context: vscode.ExtensionContext) {
                     </html>`;
             } catch (error) {
                 vscode.window.showErrorMessage('Failed to load message details.');
+            }
+        }),
+        vscode.commands.registerCommand('devmailer.deleteMessage', async (messageId: string) => {
+            if (!token) { return; }
+            try {
+                await mailService.deleteMessage(messageId, token);
+                vscode.window.showInformationMessage('Message deleted.');
+                updateView();
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to delete message.');
             }
         })
     );

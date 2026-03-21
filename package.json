@@ -62,6 +62,21 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "DevMailer",
+      "properties": {
+        "devmailer.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically check for new emails."
+        },
+        "devmailer.refreshInterval": {
+          "type": "number",
+          "default": 15,
+          "description": "The interval (in seconds) to check for new emails (minimum 5s)."
+        }
+      }
     }
   },
   "scripts": {
