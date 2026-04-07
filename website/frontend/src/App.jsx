@@ -14,7 +14,8 @@ function App() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const response = await fetch(`${process.env.BACKEND_URL}/auth/status`, {
+        const backendUrl = import.meta.env.VITE_API_BACKEND_URL;
+        const response = await fetch(`${backendUrl}/auth/status`, {
           credentials: 'include'
         });
         const data = await response.json();
