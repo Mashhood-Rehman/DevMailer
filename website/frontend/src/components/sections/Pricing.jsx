@@ -3,7 +3,6 @@ import React from 'react';
 const Pricing = () => {
   const handleCheckout = async () => {
     try {
-      // Assuming backend is at localhost:3000
       const response = await fetch(`${import.meta.env.VITE_API_BACKEND_URL}/payments/create-checkout`, {
         method: 'POST',
         headers: {
@@ -13,11 +12,9 @@ const Pricing = () => {
       });
 
       if (response.status === 401) {
-        // Redirect to login if not authenticated
         window.location.href = `${import.meta.env.VITE_API_BACKEND_URL}/auth/google`;
         return;
       }
-
       const data = await response.json();
       if (data.url) {
         window.location.href = data.url;
@@ -51,7 +48,7 @@ const Pricing = () => {
                 <span className="text-slate-500 text-sm">/ forever</span>
               </div>
               <p className="text-slate-400 text-sm">For solo devs and weekend warriors hacking on personal projects.</p>
-              <div className="flex-grow space-y-4 border-t border-slate-700 pt-6">
+              <div className="grow space-y-4 border-t border-slate-700 pt-6">
                 <div className="flex items-center gap-2 text-sm text-slate-300">
                   <span className="material-symbols-outlined text-primary text-sm">check</span> 10 Emails per day
                 </div>
@@ -69,8 +66,8 @@ const Pricing = () => {
           </div>
 
           {/* Pro Card (Highlighted) */}
-          <div className="col-span-1 p-1 rounded-2xl bg-gradient-to-br from-primary via-purple-600 to-indigo-600 relative">
-            <div className="p-8 space-y-6 bg-background-dark rounded-[0.9rem] flex flex-col h-full h-full">
+          <div className="col-span-1 p-1 rounded-2xl bg-linear-to-br from-primary via-purple-600 to-indigo-600 relative">
+            <div className="p-8 space-y-6 bg-background-dark rounded-[0.9rem] flex flex-col h-full">
               <div className="flex justify-between items-start">
                 <h4 className="text-primary font-bold text-xl italic tracking-tighter">Pro Developer</h4>
                 <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">
@@ -82,7 +79,7 @@ const Pricing = () => {
                 <span className="text-slate-500 text-sm">/ monthly</span>
               </div>
               <p className="text-slate-400 text-sm">For professional developers who need serious testing capabilities.</p>
-              <div className="flex-grow space-y-4 border-t border-slate-700 pt-6">
+              <div className="grow space-y-4 border-t border-slate-700 pt-6">
                 <div className="flex items-center gap-2 text-sm text-slate-300">
                   <span className="material-symbols-outlined text-primary text-sm">check</span> 50 Emails per day
                 </div>
@@ -107,13 +104,13 @@ const Pricing = () => {
 
           {/* Enterprise Card */}
           <div className="col-span-1 p-1 rounded-2xl bg-slate-800 border border-slate-700">
-            <div className="p-8 space-y-6 flex flex-col h-full h-full">
+            <div className="p-8 space-y-6 flex flex-col h-full">
               <h4 className="text-slate-100 font-bold text-xl italic tracking-tighter">Enterprise Forge</h4>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-black text-slate-100">Custom</span>
               </div>
               <p className="text-slate-400 text-sm">For agencies and large scale engineering organizations.</p>
-              <div className="flex-grow space-y-4 border-t border-slate-700 pt-6">
+              <div className="grow space-y-4 border-t border-slate-700 pt-6">
                 <div className="flex items-center gap-2 text-sm text-slate-300">
                   <span className="material-symbols-outlined text-primary text-sm">check</span> Team License Management
                 </div>

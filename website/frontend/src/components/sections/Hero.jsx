@@ -47,9 +47,8 @@ const Hero = () => {
           </div>
         </div>
 
-        {/* Right Column: Preview Image */}
         <div className="col-span-1 md:col-span-12 lg:col-span-6 relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+          <div className="absolute -inset-1 bg-linear-to-r from-primary to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
           <div className="relative bg-slate-900 rounded-xl border border-slate-700 overflow-hidden shadow-2xl">
             <div className="flex items-center gap-2 px-4 py-2 bg-slate-800 border-b border-slate-700">
               <div className="flex gap-1.5">
@@ -67,7 +66,7 @@ const Hero = () => {
                 alt="DevMailer Preview"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXW7usCC2PNGfe7awqux9deSWV95PupW48hmkcxMmcUweh7vAn3cbpAgsurcxLECKjFQTnhojH6beibSk4GZrsvYijHdVpctf8FzCD4dQX-afqHDFEL60itRbxdJpxG3v7ZnVLCI_aU6-uZvfAbFEYUkWOjzytMl0JbL2zx8s5MHkb3vS5tjU5m0riBV-AyH5B_y-LhfdIE_smd1-uDYyfbxMCvSDjd7yGyz6H-rdL4SXlcDjO4Mro9te8BohM3ITGm56eEwogeLQ"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-background-dark/80 to-transparent"></div>
+              <div className="absolute inset-0 bg-linear-to-t from-background-dark/80 to-transparent"></div>
               <div className="absolute bottom-6 left-6 right-6 p-4 glass-panel border border-primary/20">
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-primary">analytics</span>
