@@ -13,8 +13,14 @@ const cors = require('cors');
 const PORT = process.env.PORT || 3000;
 
 // CORS - allow extension and website
+const allowedOrigins = [
+    'http://localhost:5173', 
+    'vscode-webview://*',
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: ['http://localhost:5173', 'vscode-webview://*'],
+    origin: allowedOrigins,
     credentials: true
 }));
 
@@ -33,10 +39,14 @@ passport.deserializeUser(async (id, done) => {
 });
 
 // Passport Google Strategy
+const callbackURL = process.env.BACKEND_URL 
+    ? `${process.env.BACKEND_URL}/auth/google/callback`
+    : `http://localhost:${PORT}/auth/google/callback`;
+
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `http://localhost:${PORT}/auth/google/callback`
+    callbackURL: callbackURL
 },
     async (accessToken, refreshToken, profile, done) => {
         try {
@@ -69,10 +79,13 @@ passport.use(new GoogleStrategy({
 
 // Middlewares
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'devmailer-secret',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // Set to true if using https
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', // true if https
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -83,6 +96,9 @@ app.use(express.json({
         req.rawBody = buf;
     }
 }));
+
+// Health Check for Render
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
 // Auth Routes
 app.get('/auth/google', (req, res, next) => {
@@ -295,12 +311,31 @@ app.post('/payments/create-checkout', async (req, res) => {
             }
         });
 
-        // Lemon Squeezy returns the checkout url in this path:
+    // Lemon Squeezy returns the checkout url in this path:
         res.json({ url: response.data.data.attributes.url });
     } catch (error) {
         console.error('Lemon Squeezy Error:', error.response?.data || error.message);
         res.status(500).json({ error: 'Failed to create checkout session' });
     }
+});
+
+app.get('/payments/customer-portal', async (req, res) => {
+    if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Lemon Squeezy Customer Portal is typically at your store's billing URL
+    // You can find this in your Lemon Squeezy Dashboard -> Settings -> Customer Portal
+    const portalUrl = process.env.LEMONSQUEEZY_BILLING_URL;
+    
+    if (!portalUrl) {
+        return res.status(500).json({ error: 'Billing URL not configured' });
+    }
+    
+    // We can append the email to pre-fill it if needed
+    const redirectUrl = `${portalUrl}?email=${encodeURIComponent(req.user.email)}`;
+    
+    res.json({ url: redirectUrl });
 });
 
 // Lemon Squeezy Webhook
@@ -323,19 +358,35 @@ app.post('/payments/webhook', async (req, res) => {
         const eventName = payload.meta.event_name;
 
         // Listen for new orders / subscriptions
-        if (eventName === 'order_created' || eventName === 'subscription_created') {
+        if (eventName === 'order_created' || eventName === 'subscription_created' || eventName === 'subscription_updated') {
             const customData = payload.meta.custom_data;
             const customerId = payload.data.attributes.customer_id.toString();
+            const status = payload.data.attributes.status;
+
+            // If it's an update, check if it's still active
+            const isPremium = !status || ['active', 'on_trial'].includes(status);
 
             if (customData && customData.user_id) {
                 await prisma.user.update({
                     where: { id: customData.user_id },
                     data: {
-                        tier: 'PREMIUM',
+                        tier: isPremium ? 'PREMIUM' : 'FREE',
                         lemonSqueezyId: customerId
                     }
                 });
-                console.log(`Upgraded user ${customData.user_id} to PREMIUM via Lemon Squeezy.`);
+                console.log(`Updated user ${customData.user_id} tier to ${isPremium ? 'PREMIUM' : 'FREE'} via LS webhook.`);
+            }
+        }
+
+        // Handle cancellations
+        if (eventName === 'subscription_cancelled' || eventName === 'subscription_expired') {
+            const customData = payload.meta.custom_data;
+            if (customData && customData.user_id) {
+                await prisma.user.update({
+                    where: { id: customData.user_id },
+                    data: { tier: 'FREE' }
+                });
+                console.log(`Revoked PREMIUM for user ${customData.user_id} due to cancellation/expiry.`);
             }
         }
     } catch (err) {

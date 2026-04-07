@@ -4,17 +4,17 @@ const Pricing = () => {
   const handleCheckout = async () => {
     try {
       // Assuming backend is at localhost:3000
-      const response = await fetch('http://localhost:3000/payments/create-checkout', {
+      const response = await fetch(`${import.meta.env.VITE_API_BACKEND_URL}/payments/create-checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // In a real app, you'd need credentials/sessions if not using a token
+        credentials: 'include'
       });
-      
+
       if (response.status === 401) {
         // Redirect to login if not authenticated
-        window.location.href = 'http://localhost:3000/auth/google';
+        window.location.href = `${import.meta.env.VITE_API_BACKEND_URL}/auth/google`;
         return;
       }
 
@@ -41,10 +41,10 @@ const Pricing = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4">
-          
+
           {/* Hobbyist Card */}
           <div className="col-span-1 p-1 rounded-2xl bg-slate-800 border border-slate-700">
-            <div className="p-8 space-y-6 flex flex-col h-full h-full">
+            <div className="p-8 space-y-6 flex flex-col h-full">
               <h4 className="text-slate-100 font-bold text-xl italic tracking-tighter">Indie Hobbyist</h4>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-black text-slate-100">$0</span>
@@ -96,7 +96,7 @@ const Pricing = () => {
                   <span className="material-symbols-outlined text-primary text-sm">check</span> Cloud Sync Settings
                 </div>
               </div>
-              <button 
+              <button
                 onClick={handleCheckout}
                 className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 font-bold text-white transition-colors shadow-lg shadow-primary/30"
               >

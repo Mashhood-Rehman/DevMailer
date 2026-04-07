@@ -14,7 +14,7 @@ function App() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const response = await fetch('http://localhost:3000/auth/status', {
+        const response = await fetch(`${process.env.BACKEND_URL}/auth/status`, {
           credentials: 'include'
         });
         const data = await response.json();
@@ -31,7 +31,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-900 overflow-x-hidden">
       <Navbar user={user} setView={setCurrentView} currentView={currentView} />
-      
+
       {currentView === 'home' ? (
         <main className="grid grid-cols-12 gap-y-24">
           <Hero />
@@ -44,7 +44,7 @@ function App() {
           <Dashboard user={user} />
         </main>
       )}
-      
+
       <Footer />
     </div>
   );

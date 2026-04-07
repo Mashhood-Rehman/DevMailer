@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import logoIcon from '../../assets/icon.png';
 
 const Navbar = ({ user, setView, currentView }) => {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -35,8 +36,8 @@ const Navbar = ({ user, setView, currentView }) => {
           className="flex items-center gap-3 cursor-pointer group"
           onClick={() => setView('home')}
         >
-          <div className="text-blue-500 group-hover:scale-110 transition-transform">
-            <span className="material-symbols-outlined text-3xl">terminal</span>
+          <div className="size-10 group-hover:scale-110 transition-transform">
+            <img src={logoIcon} alt="DevMailer" className="w-full h-full object-contain" />
           </div>
           <h2 className="text-slate-100 text-xl font-bold tracking-tight">DevMailer</h2>
         </div>
