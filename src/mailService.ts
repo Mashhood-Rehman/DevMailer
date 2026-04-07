@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as vscode from 'vscode';
 
 export interface MailAccount {
     address: string;
@@ -21,6 +22,11 @@ export interface MailMessage {
 export class MailService {
     private readonly baseUrl = 'https://api.mail.tm';
 
+    private getBackendUrl(): string {
+        const config = vscode.workspace.getConfiguration('devmailer');
+        return config.get<string>('backendUrl', 'http://localhost:3000');
+    }
+
     async getDomain(): Promise<string> {
         try {
             const response = await axios.get(`${this.baseUrl}/domains`);
@@ -34,7 +40,8 @@ export class MailService {
     async createAccount(): Promise<{ address: string; password: string }> {
         // Check/Increment limit on backend
         try {
-            const incResponse = await axios.post('http://localhost:3000/emails/increment');
+            const backendUrl = this.getBackendUrl();
+            const incResponse = await axios.post(`${backendUrl}/emails/increment`);
             if (!incResponse.data.success) {
                 throw new Error(incResponse.data.message || 'Limit reached');
             }
@@ -114,7 +121,8 @@ export class MailService {
 
     async getAuthStatus(): Promise<any> {
         try {
-            const response = await axios.get('http://localhost:3000/auth/status');
+            const backendUrl = this.getBackendUrl();
+            const response = await axios.get(`${backendUrl}/auth/status`);
             return response.data;
         } catch (error) {
             console.error('Error getting auth status:', error);

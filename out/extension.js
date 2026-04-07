@@ -189,10 +189,12 @@ async function activate(context) {
     }));
     startPolling();
     context.subscriptions.push(vscode.commands.registerCommand('devmailer.login', () => {
+        const config = vscode.workspace.getConfiguration('devmailer');
+        const backendUrl = config.get('backendUrl', 'http://localhost:3000');
         const scheme = vscode.env.uriScheme || 'vscode';
         const extensionId = context.extension.id;
-        console.log(`[DevMailer] Initiating login with scheme: ${scheme}, extension: ${extensionId}`);
-        vscode.env.openExternal(vscode.Uri.parse(`http://localhost:3000/auth/google?scheme=${scheme}&extensionId=${extensionId}`));
+        console.log(`[DevMailer] Initiating login with scheme: ${scheme}, extension: ${extensionId}, backend: ${backendUrl}`);
+        vscode.env.openExternal(vscode.Uri.parse(`${backendUrl}/auth/google?scheme=${scheme}&extensionId=${extensionId}`));
     }), vscode.commands.registerCommand('devmailer.manualAuth', async () => {
         const input = await vscode.window.showInputBox({
             prompt: 'Paste the authentication token from your browser',
@@ -200,7 +202,6 @@ async function activate(context) {
         });
         if (input) {
             try {
-                // Expecting base64 encoded user JSON
                 const userData = JSON.parse(Buffer.from(input, 'base64').toString('utf8'));
                 user = userData;
                 await context.globalState.update('user', userData);
